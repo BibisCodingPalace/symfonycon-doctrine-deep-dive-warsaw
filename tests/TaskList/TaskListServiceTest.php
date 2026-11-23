@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\TaskList;
 
 use App\DataFixtures\AppFixtures;
+use App\Entity\TaskList;
 use App\TaskList\TaskListService;
 use App\Tests\Support\ReloadsAppFixturesTrait;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\OptimisticLockException;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
@@ -119,13 +122,54 @@ final class TaskListServiceTest extends KernelTestCase
         self::assertTrue($reloaded->isAccessibleBy(self::fixtureUser(AppFixtures::USER3_EMAIL)));
     }
 
-    public function testArchiveMarksListAsArchived(): void
+    public function testArchiveMarksListAsArchivedAndIncrementsTheVersion(): void
+    {
+        $taskList = self::fixtureList('User 1 main list');
+        $version = $taskList->getVersion();
+
+        $this->service()->archive(self::fixtureUser(AppFixtures::USER1_EMAIL), $taskList, $version);
+
+        self::assertTrue($taskList->isArchived());
+        self::assertSame($version + 1, $taskList->getVersion());
+    }
+
+    public function testArchiveFailsIfTheUserHasSeenAnOlderVersion(): void
+    {
+        $taskList = self::fixtureList('User 1 main list');
+        $seenVersion = $taskList->getVersion();
+
+        $this->changeListInAnotherRequest($taskList);
+        self::getContainer()->get(EntityManagerInterface::class)->refresh($taskList);
+
+        try {
+            $this->service()->archive(self::fixtureUser(AppFixtures::USER1_EMAIL), $taskList, $seenVersion);
+            self::fail('Expected an OptimisticLockException.');
+        } catch (OptimisticLockException) {
+            self::assertFalse($taskList->isArchived(), 'The version is checked before the list is changed.');
+        }
+    }
+
+    public function testArchiveFailsIfTheListIsChangedWhileTheRequestIsRunning(): void
     {
         $taskList = self::fixtureList('User 1 main list');
 
-        $this->service()->archive(self::fixtureUser(AppFixtures::USER1_EMAIL), $taskList);
+        // The entity in memory still has the old version, only the versioned UPDATE detects the conflict.
+        $this->changeListInAnotherRequest($taskList);
 
-        self::assertTrue($taskList->isArchived());
+        $this->expectException(OptimisticLockException::class);
+
+        $this->service()->archive(self::fixtureUser(AppFixtures::USER1_EMAIL), $taskList, $taskList->getVersion());
+    }
+
+    /**
+     * Simulates a concurrent request by changing the row behind the back of the EntityManager.
+     */
+    private function changeListInAnotherRequest(TaskList $taskList): void
+    {
+        self::getContainer()->get(Connection::class)->executeStatement(
+            'UPDATE app_task_lists SET version = version + 1 WHERE id = :id',
+            ['id' => $taskList->getId()],
+        );
     }
 
     private function service(): TaskListService

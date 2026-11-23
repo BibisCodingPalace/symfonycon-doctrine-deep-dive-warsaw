@@ -6,6 +6,7 @@ namespace App\Tests\Controller;
 
 use App\DataFixtures\AppFixtures;
 use App\Tests\Support\ReloadsAppFixturesTrait;
+use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -159,6 +160,27 @@ final class TaskListControllerTest extends WebTestCase
 
         self::assertSelectorTextContains('h2 .badge', 'archived');
         self::assertSelectorNotExists('#task_summary');
+    }
+
+    public function testArchiveFailsIfTheListWasChangedInTheMeantime(): void
+    {
+        $listId = self::fixtureList('User 1 main list')->getId();
+
+        $this->loginAs(AppFixtures::USER1_EMAIL);
+        $this->client->request('GET', '/show/'.$listId);
+
+        // Another user changes the list after the page was rendered.
+        static::getContainer()->get(Connection::class)->executeStatement(
+            'UPDATE app_task_lists SET version = version + 1 WHERE id = :id',
+            ['id' => $listId],
+        );
+
+        $this->client->submitForm('Archive list');
+        self::assertResponseRedirects('/show/'.$listId);
+        $this->client->followRedirect();
+
+        self::assertSelectorTextContains('.alert-danger', 'The list was changed in the meantime.');
+        self::assertSelectorNotExists('h2 .badge');
     }
 
     public function testOwnerCanAddContributor(): void

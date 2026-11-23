@@ -11,6 +11,7 @@ use App\Form\ContributorType;
 use App\Repository\TaskListRepository;
 use App\Repository\TaskRepository;
 use App\TaskList\TaskListService;
+use Doctrine\ORM\OptimisticLockException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -106,9 +107,13 @@ final class TaskListController extends AbstractController
     }
 
     #[Route('/archive/{id}', name: 'archive', methods: ['POST'])]
-    public function archive(TaskList $taskList, #[CurrentUser] User $user): Response
+    public function archive(Request $request, TaskList $taskList, #[CurrentUser] User $user): Response
     {
-        $this->taskListService->archive($user, $taskList);
+        try {
+            $this->taskListService->archive($user, $taskList, $request->request->getInt('version'));
+        } catch (OptimisticLockException) {
+            $this->addFlash('danger', 'The list was changed in the meantime. Please check it and try again.');
+        }
 
         return $this->redirectToRoute('tasklist_show', ['id' => $taskList->getId()]);
     }

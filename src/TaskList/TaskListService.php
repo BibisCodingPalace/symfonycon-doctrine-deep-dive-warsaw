@@ -8,7 +8,9 @@ use App\Entity\Task;
 use App\Entity\TaskList;
 use App\Entity\User;
 use App\Repository\TaskListRepository;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\OptimisticLockException;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 /**
@@ -94,11 +96,21 @@ final readonly class TaskListService
         $this->taskListRepository->clearResultCache();
     }
 
-    public function archive(User $actor, TaskList $taskList): void
+    /**
+     * Archives the list, but only in the version the user has seen.
+     *
+     * @throws OptimisticLockException if the list was changed in the meantime
+     */
+    public function archive(User $actor, TaskList $taskList, int $expectedVersion): void
     {
         $this->assertCanBeModifiedBy($actor, $taskList);
 
+        // Fails if the list was changed between rendering the page and submitting the form ...
+        $this->entityManager->lock($taskList, LockMode::OPTIMISTIC, $expectedVersion);
+
         $taskList->archive();
+
+        // ... and the versioned UPDATE fails if it is changed between loading and flushing in this request.
         $this->entityManager->flush();
         $this->taskListRepository->clearResultCache();
     }

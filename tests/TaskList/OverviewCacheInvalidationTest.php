@@ -60,7 +60,8 @@ final class OverviewCacheInvalidationTest extends AbstractRepositoryKernelTestCa
         self::assertCount(2, $this->repository()->findActive($user1));
         self::assertCount(1, $this->repository()->findArchived($user1));
 
-        $this->service()->archive($user1, self::fixtureList('User 1 main list'));
+        $taskList = self::fixtureList('User 1 main list');
+        $this->service()->archive($user1, $taskList, $taskList->getVersion());
 
         self::assertCount(1, $this->repository()->findActive($user1));
         self::assertCount(2, $this->repository()->findArchived($user1));

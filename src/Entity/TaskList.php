@@ -19,6 +19,14 @@ class TaskList
     #[ORM\Column(type: Types::BIGINT)]
     private ?int $id = null;
 
+    /**
+     * Incremented by Doctrine with every UPDATE of the list. The UPDATE itself is restricted to the
+     * version which was loaded: "UPDATE app_task_lists SET ... WHERE id = ? AND version = ?".
+     */
+    #[ORM\Version]
+    #[ORM\Column(type: Types::INTEGER)]
+    private int $version = 1;
+
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
     private User $owner;
@@ -100,6 +108,11 @@ class TaskList
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getVersion(): int
+    {
+        return $this->version;
     }
 
     public function getOwner(): User
