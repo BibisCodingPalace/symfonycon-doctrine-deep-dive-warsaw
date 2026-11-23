@@ -7,11 +7,15 @@ namespace App\TaskList;
 use App\Entity\Task;
 use App\Entity\TaskList;
 use App\Entity\User;
+use App\Repository\TaskListRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 /**
  * All write operations on task lists.
+ *
+ * The overview queries are cached (see TaskListRepository), so every change which is visible
+ * in the overview has to delete the cached results after it was written.
  *
  * Invalid input is reported with an \InvalidArgumentException, missing permissions with an AccessDeniedException.
  */
@@ -19,6 +23,7 @@ final readonly class TaskListService
 {
     public function __construct(
         private EntityManagerInterface $entityManager,
+        private TaskListRepository $taskListRepository,
     ) {
     }
 
@@ -32,6 +37,7 @@ final readonly class TaskListService
         $taskList = new TaskList($owner, $title);
         $this->entityManager->persist($taskList);
         $this->entityManager->flush();
+        $this->taskListRepository->clearResultCache();
 
         return $taskList;
     }
@@ -48,6 +54,7 @@ final readonly class TaskListService
         // The new task is persisted by the cascade on TaskList::$items.
         $task = $taskList->addItem($summary);
         $this->entityManager->flush();
+        $this->taskListRepository->clearResultCache();
 
         return $task;
     }
@@ -84,6 +91,7 @@ final readonly class TaskListService
 
         $taskList->addContributor($contributor);
         $this->entityManager->flush();
+        $this->taskListRepository->clearResultCache();
     }
 
     public function archive(User $actor, TaskList $taskList): void
@@ -92,6 +100,7 @@ final readonly class TaskListService
 
         $taskList->archive();
         $this->entityManager->flush();
+        $this->taskListRepository->clearResultCache();
     }
 
     private function assertCanBeModifiedBy(User $actor, TaskList $taskList): void

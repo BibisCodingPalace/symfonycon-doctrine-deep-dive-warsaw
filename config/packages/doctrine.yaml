@@ -14,6 +14,10 @@ doctrine:
             Doctrine\DBAL\Platforms\PostgreSQLPlatform: identity
         # Generate the schema with the DBAL schema editor API (ORM 3.8+, mandatory with ORM 4)
         use_schema_editor_api: true
+        # Query results are cached in a PSR-6 pool, so that they survive the request
+        result_cache_driver:
+            type: pool
+            pool: doctrine.result_cache_pool
         auto_mapping: true
         mappings:
             App:
@@ -22,11 +26,24 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Entity'
                 prefix: 'App\Entity'
 
+framework:
+    cache:
+        pools:
+            doctrine.result_cache_pool:
+                adapter: cache.app
+
 when@test:
     doctrine:
         dbal:
             # "TEST_TOKEN" is typically set by ParaTest
             dbname_suffix: '_test%env(default::TEST_TOKEN)%'
+
+    framework:
+        cache:
+            pools:
+                # Every test starts with an empty result cache
+                doctrine.result_cache_pool:
+                    adapter: cache.adapter.array
 
 when@prod:
     doctrine:
@@ -34,14 +51,9 @@ when@prod:
             query_cache_driver:
                 type: pool
                 pool: doctrine.system_cache_pool
-            result_cache_driver:
-                type: pool
-                pool: doctrine.result_cache_pool
 
     framework:
         cache:
             pools:
-                doctrine.result_cache_pool:
-                    adapter: cache.app
                 doctrine.system_cache_pool:
                     adapter: cache.system

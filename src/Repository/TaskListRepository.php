@@ -15,9 +15,37 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class TaskListRepository extends ServiceEntityRepository
 {
+    public const int RESULT_CACHE_LIFETIME = 3600;
+
+    public const string CACHE_SUMMARIZED = 'frontpage_summarized';
+    public const string CACHE_OWNED = 'frontpage_owned';
+    public const string CACHE_CONTRIBUTED = 'frontpage_contributed';
+    public const string CACHE_ACTIVE = 'frontpage_active';
+    public const string CACHE_ARCHIVED = 'frontpage_archived';
+
+    /**
+     * The ids of all cached overview queries. A cache entry holds the results for all users:
+     * DBAL stores one result per combination of SQL and parameters under the same id.
+     */
+    public const array RESULT_CACHE_IDS = [
+        self::CACHE_SUMMARIZED,
+        self::CACHE_OWNED,
+        self::CACHE_CONTRIBUTED,
+        self::CACHE_ACTIVE,
+        self::CACHE_ARCHIVED,
+    ];
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, TaskList::class);
+    }
+
+    /**
+     * Deletes the cached results of all overview queries, for all users.
+     */
+    public function clearResultCache(): void
+    {
+        $this->getEntityManager()->getConfiguration()->getResultCache()?->deleteItems(self::RESULT_CACHE_IDS);
     }
 
     /**
@@ -45,6 +73,7 @@ class TaskListRepository extends ServiceEntityRepository
         return $this->getEntityManager()
             ->createQuery($dql)
             ->setParameter('owner', $user)
+            ->enableResultCache(self::RESULT_CACHE_LIFETIME, self::CACHE_SUMMARIZED)
             ->getResult();
     }
 
@@ -63,6 +92,7 @@ class TaskListRepository extends ServiceEntityRepository
         return $this->getEntityManager()
             ->createQuery($dql)
             ->setParameter('owner', $owner)
+            ->enableResultCache(self::RESULT_CACHE_LIFETIME, self::CACHE_OWNED)
             ->getResult();
     }
 
@@ -78,6 +108,7 @@ class TaskListRepository extends ServiceEntityRepository
             ->orderBy('task_list.created', \SortDirection::Ascending)
             ->addOrderBy('task_list.id', \SortDirection::Ascending)
             ->getQuery()
+            ->enableResultCache(self::RESULT_CACHE_LIFETIME, self::CACHE_CONTRIBUTED)
             ->getResult();
     }
 
@@ -93,6 +124,7 @@ class TaskListRepository extends ServiceEntityRepository
             ->orderBy('task_list.created', \SortDirection::Ascending)
             ->addOrderBy('task_list.id', \SortDirection::Ascending)
             ->getQuery()
+            ->enableResultCache(self::RESULT_CACHE_LIFETIME, self::CACHE_ACTIVE)
             ->getResult();
     }
 
@@ -108,6 +140,7 @@ class TaskListRepository extends ServiceEntityRepository
             ->orderBy('task_list.created', \SortDirection::Ascending)
             ->addOrderBy('task_list.id', \SortDirection::Ascending)
             ->getQuery()
+            ->enableResultCache(self::RESULT_CACHE_LIFETIME, self::CACHE_ARCHIVED)
             ->getResult();
     }
 }

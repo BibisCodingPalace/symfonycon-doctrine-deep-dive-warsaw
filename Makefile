@@ -45,8 +45,9 @@ migrate: ## Run Doctrine migrations
 	$(CONSOLE) doctrine:migrations:migrate --no-interaction --allow-no-migration
 
 .PHONY: fixtures
-fixtures: ## Load Doctrine fixtures (purges the database)
+fixtures: ## Load Doctrine fixtures (purges the database and the result cache)
 	$(CONSOLE) doctrine:fixtures:load --no-interaction
+	$(CONSOLE) cache:pool:clear doctrine.result_cache_pool
 
 .PHONY: cleanup-tests
 cleanup-tests: ## Drop the test database
