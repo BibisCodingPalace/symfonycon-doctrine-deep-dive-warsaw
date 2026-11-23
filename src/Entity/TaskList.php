@@ -80,6 +80,23 @@ class TaskList
         $this->lastUpdated = new \DateTimeImmutable();
     }
 
+    /**
+     * Doctrine's identity map guarantees one object per database row within an EntityManager,
+     * so users can be compared by identity.
+     */
+    public function isOwnedBy(User $user): bool
+    {
+        return $this->owner === $user;
+    }
+
+    /**
+     * Owners and contributors may see the list and work on its tasks.
+     */
+    public function isAccessibleBy(User $user): bool
+    {
+        return $this->isOwnedBy($user) || $this->contributors->contains($user);
+    }
+
     public function getId(): ?int
     {
         return $this->id;

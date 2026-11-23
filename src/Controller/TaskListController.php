@@ -4,152 +4,147 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\Task;
+use App\Entity\TaskList;
+use App\Entity\User;
+use App\Form\ContributorType;
+use App\Repository\TaskListRepository;
+use App\Repository\TaskRepository;
+use App\TaskList\TaskListService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Attribute\MapQueryParameter;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
-/**
- * Starting point of the workshop: all actions work on hard-coded dummy data.
- *
- * Task 1 replaces the dummy data with real Doctrine queries, see README.md.
- */
 #[Route(name: 'tasklist_')]
 final class TaskListController extends AbstractController
 {
+    public function __construct(
+        private readonly TaskListRepository $taskListRepository,
+        private readonly TaskRepository $taskRepository,
+        private readonly TaskListService $taskListService,
+    ) {
+    }
+
     #[Route('/', name: 'list', methods: ['GET'])]
-    public function index(): Response
+    public function index(#[CurrentUser] User $user, #[MapQueryParameter] ?string $filter = null): Response
     {
-        // TODO Task 1: load the lists of the logged-in user, depending on the "filter" query parameter:
-        //   (none)       => summary (DTO) of the lists owned by the user
-        //   own          => lists owned by the user
-        //   contributing => lists the user contributes to
-        //   active       => owned lists which are not archived
-        //   archived     => owned lists which are archived
+        if (null === $filter) {
+            return $this->render('tasks/index_summarized.html.twig', [
+                'lists' => $this->taskListRepository->findSummarizedTaskListFor($user),
+            ]);
+        }
+
+        $taskLists = match ($filter) {
+            'own' => $this->taskListRepository->findListsOwnedBy($user),
+            'contributing' => $this->taskListRepository->findListsContributedBy($user),
+            'active' => $this->taskListRepository->findActive($user),
+            'archived' => $this->taskListRepository->findArchived($user),
+            default => throw $this->createNotFoundException(sprintf('Unknown filter "%s".', $filter)),
+        };
+
         return $this->render('tasks/index.html.twig', [
-            'task_lists' => self::dummyTaskLists(),
+            'task_lists' => $taskLists,
         ]);
     }
 
     #[Route('/', name: 'create', methods: ['POST'])]
-    public function create(): Response
+    public function create(Request $request, #[CurrentUser] User $user): Response
     {
-        // TODO Task 1: create a new TaskList for the logged-in user and redirect to it.
-        $this->addFlash('warning', 'Creating lists is not implemented yet.');
+        try {
+            $taskList = $this->taskListService->createTaskList($user, $request->request->getString('name'));
+        } catch (\InvalidArgumentException $exception) {
+            $this->addFlash('danger', $exception->getMessage());
 
-        return $this->redirectToRoute('tasklist_list');
+            return $this->redirectToRoute('tasklist_list');
+        }
+
+        return $this->redirectToRoute('tasklist_show', ['id' => $taskList->getId()]);
     }
 
     #[Route('/show/{id}', name: 'show', methods: ['GET'])]
-    public function show(int $id): Response
+    public function show(TaskList $taskList, #[CurrentUser] User $user): Response
     {
-        // TODO Task 1: load the TaskList from the database.
+        $this->denyAccessUnlessMember($taskList, $user);
+
         return $this->render('tasks/show.html.twig', [
-            'task_list' => self::dummyTaskLists()[$id] ?? throw $this->createNotFoundException('Task list not found.'),
+            'task_list' => $taskList,
         ]);
     }
 
     #[Route('/recent/{id}', name: 'recent', methods: ['GET'])]
-    public function recent(int $id): Response
+    public function recent(TaskList $taskList, #[CurrentUser] User $user): Response
     {
-        // TODO Task 1: load the tasks of this list which were created today.
-        $taskList = self::dummyTaskLists()[$id] ?? throw $this->createNotFoundException('Task list not found.');
+        $this->denyAccessUnlessMember($taskList, $user);
 
         return $this->render('tasks/recent.html.twig', [
             'task_list' => $taskList,
-            'tasks' => $taskList['items'],
+            'tasks' => $this->taskRepository->findTasksCreatedToday($taskList),
         ]);
     }
 
     #[Route('/add/{id}', name: 'add', methods: ['POST'])]
-    public function add(int $id): Response
+    public function add(Request $request, TaskList $taskList, #[CurrentUser] User $user): Response
     {
-        // TODO Task 1: add a new task to the list.
-        $this->addFlash('warning', 'Adding tasks is not implemented yet.');
+        try {
+            $this->taskListService->addTask($user, $taskList, $request->request->getString('summary'));
+        } catch (\InvalidArgumentException $exception) {
+            $this->addFlash('danger', $exception->getMessage());
+        }
 
-        return $this->redirectToRoute('tasklist_show', ['id' => $id]);
+        return $this->redirectToRoute('tasklist_show', ['id' => $taskList->getId()]);
     }
 
     #[Route('/update/{id}', name: 'item_update', methods: ['POST'])]
-    public function update(int $id): Response
+    public function update(Task $task, #[CurrentUser] User $user): Response
     {
-        // TODO Task 1: close or reopen the task and redirect to its list ($id is the id of the task).
-        $this->addFlash('warning', 'Closing and reopening tasks is not implemented yet.');
+        $this->taskListService->toggleTask($user, $task);
 
-        return $this->redirectToRoute('tasklist_list');
+        return $this->redirectToRoute('tasklist_show', ['id' => $task->getList()->getId()]);
     }
 
     #[Route('/archive/{id}', name: 'archive', methods: ['POST'])]
-    public function archive(int $id): Response
+    public function archive(TaskList $taskList, #[CurrentUser] User $user): Response
     {
-        // TODO Task 1: archive the list.
-        $this->addFlash('warning', 'Archiving lists is not implemented yet.');
+        $this->taskListService->archive($user, $taskList);
 
-        return $this->redirectToRoute('tasklist_show', ['id' => $id]);
+        return $this->redirectToRoute('tasklist_show', ['id' => $taskList->getId()]);
     }
 
     #[Route('/contributors/{id}', name: 'contributors', methods: ['GET', 'POST'])]
-    public function contributors(int $id): Response
+    public function contributors(Request $request, TaskList $taskList, #[CurrentUser] User $user): Response
     {
-        // TODO Task 1: render and handle App\Form\ContributorType for the list.
-        $this->addFlash('warning', 'Adding contributors is not implemented yet.');
+        if (!$taskList->isOwnedBy($user)) {
+            throw $this->createAccessDeniedException('Only the list owner can add contributors.');
+        }
 
-        return $this->redirectToRoute('tasklist_show', ['id' => $id]);
+        $form = $this->createForm(ContributorType::class, null, ['list' => $taskList]);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $contributor = $form->get('contributor')->getData();
+
+            if ($contributor instanceof User) {
+                $this->taskListService->addContributor($user, $taskList, $contributor);
+            } else {
+                $this->addFlash('danger', 'Please select a user.');
+            }
+
+            return $this->redirectToRoute('tasklist_show', ['id' => $taskList->getId()]);
+        }
+
+        return $this->render('tasks/contributors.html.twig', [
+            'task_list' => $taskList,
+            'form' => $form,
+        ]);
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private static function dummyTaskLists(): array
+    private function denyAccessUnlessMember(TaskList $taskList, User $user): void
     {
-        $now = new \DateTimeImmutable();
-        $owner = ['email' => 'jane@example.com'];
-
-        return [
-            1 => [
-                'id' => 1,
-                'owner' => $owner,
-                'contributors' => [],
-                'title' => 'Empty test list',
-                'lastUpdatedOn' => null,
-                'createdOn' => $now,
-                'items' => [],
-                'archived' => false,
-            ],
-            2 => [
-                'id' => 2,
-                'owner' => $owner,
-                'contributors' => [],
-                'title' => 'Archived test list',
-                'lastUpdatedOn' => $now,
-                'createdOn' => $now,
-                'items' => [],
-                'archived' => true,
-            ],
-            3 => [
-                'id' => 3,
-                'owner' => $owner,
-                'contributors' => [],
-                'title' => 'Test list with 1 open item',
-                'lastUpdatedOn' => $now,
-                'createdOn' => $now,
-                'items' => [
-                    ['id' => 1, 'summary' => 'Replace with actual data', 'done' => false],
-                ],
-                'archived' => false,
-            ],
-            4 => [
-                'id' => 4,
-                'owner' => $owner,
-                'contributors' => [['email' => 'john@example.com']],
-                'title' => 'Test list with open and closed item',
-                'lastUpdatedOn' => $now,
-                'createdOn' => $now,
-                'items' => [
-                    ['id' => 2, 'summary' => 'Create dummy data', 'done' => true],
-                    ['id' => 3, 'summary' => 'Replace with actual data', 'done' => false],
-                ],
-                'archived' => false,
-            ],
-        ];
+        if (!$taskList->isAccessibleBy($user)) {
+            throw $this->createAccessDeniedException('You are not a member of this list.');
+        }
     }
 }

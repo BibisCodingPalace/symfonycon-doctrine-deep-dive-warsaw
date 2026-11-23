@@ -14,7 +14,9 @@
                 <div class="btn-group btn-group-sm">
                     <a href="{{ path('tasklist_recent', {id: task_list.id}) }}" class="btn btn-outline-primary">Today's tasks</a>
                     {% if not task_list.archived %}
-                        <a href="{{ path('tasklist_contributors', {id: task_list.id}) }}" class="btn btn-outline-primary">Add contributor</a>
+                        {% if task_list.ownedBy(app.user) %}
+                            <a href="{{ path('tasklist_contributors', {id: task_list.id}) }}" class="btn btn-outline-primary">Add contributor</a>
+                        {% endif %}
                         <button type="submit" class="btn btn-outline-secondary">Archive list</button>
                     {% endif %}
                 </div>
