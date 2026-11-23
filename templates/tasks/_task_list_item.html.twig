@@ -1,0 +1,9 @@
+{# A single task with its close/reopen button. #}
+<div class="list-group-item{% if task.done %} bg-light text-body-secondary{% endif %}">
+    <div class="d-flex justify-content-start align-items-baseline">
+        <form action="{{ path('tasklist_item_update', {id: task.id}) }}" method="post" class="me-3">
+            <button class="btn btn-sm {{ task.done ? 'btn-outline-secondary' : 'btn-primary' }}">{{ task.done ? 'reopen' : 'close' }}</button>
+        </form>
+        <strong{% if task.done %} class="text-decoration-line-through"{% endif %}>{{ task.summary|title }}</strong>
+    </div>
+</div>

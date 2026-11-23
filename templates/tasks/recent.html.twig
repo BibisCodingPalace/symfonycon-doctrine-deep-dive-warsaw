@@ -1,0 +1,16 @@
+{% extends 'layout.html.twig' %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-baseline mb-3">
+        <h2>Tasks created today in "{{ task_list.title|title }}"</h2>
+        <a href="{{ path('tasklist_show', {id: task_list.id}) }}" class="btn btn-sm btn-outline-secondary">Go back</a>
+    </div>
+
+    <div class="list-group">
+        {% for task in tasks %}
+            {{ include('tasks/_task_list_item.html.twig') }}
+        {% else %}
+            <p class="text-body-secondary">No tasks were created today.</p>
+        {% endfor %}
+    </div>
+{% endblock %}

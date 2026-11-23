@@ -1,0 +1,18 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Security\Signup;
+
+use Symfony\Component\Validator\Constraints as Assert;
+
+final class RequestSignup
+{
+    #[Assert\NotBlank]
+    #[Assert\Email]
+    public string $email;
+
+    #[Assert\NotBlank]
+    #[Assert\PasswordStrength(minScore: Assert\PasswordStrength::STRENGTH_MEDIUM)]
+    public string $plainPassword;
+}

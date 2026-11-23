@@ -1,0 +1,22 @@
+{# Form for creating a list and the filter tabs shown above every list overview. #}
+{% set filter = app.request.query.get('filter') %}
+
+<form action="{{ path('tasklist_create') }}" method="post" class="mb-4">
+    <div class="row g-2">
+        <div class="col-sm-9 col-lg-10">
+            <label for="list_name" class="visually-hidden">List name</label>
+            <input id="list_name" type="text" class="form-control form-control-lg" name="name" placeholder="Give your list a name" required>
+        </div>
+        <div class="col-sm-3 col-lg-2 d-grid">
+            <button class="btn btn-outline-primary btn-lg" type="submit">Create a list</button>
+        </div>
+    </div>
+</form>
+
+<ul class="nav nav-tabs">
+    <li class="nav-item"><a class="nav-link{% if filter is null %} active bg-light{% endif %}" href="{{ path('tasklist_list') }}">All Lists</a></li>
+    <li class="nav-item"><a class="nav-link{% if filter == 'own' %} active bg-light{% endif %}" href="{{ path('tasklist_list', {filter: 'own'}) }}">My Lists</a></li>
+    <li class="nav-item"><a class="nav-link{% if filter == 'contributing' %} active bg-light{% endif %}" href="{{ path('tasklist_list', {filter: 'contributing'}) }}">Contributing Lists</a></li>
+    <li class="nav-item"><a class="nav-link{% if filter == 'active' %} active bg-light{% endif %}" href="{{ path('tasklist_list', {filter: 'active'}) }}">Active Lists</a></li>
+    <li class="nav-item"><a class="nav-link{% if filter == 'archived' %} active bg-light{% endif %}" href="{{ path('tasklist_list', {filter: 'archived'}) }}">Archived Lists</a></li>
+</ul>

@@ -1,0 +1,21 @@
+{% extends 'layout.html.twig' %}
+
+{% block content %}
+    <div class="bg-white rounded shadow-sm p-3 mb-3">
+        <h2>{{ task_list.title|title }}</h2>
+        <p>
+            created by <strong>{{ task_list.owner.email }}</strong>
+            {% if task_list.contributors is not empty %}
+                with contributions from: {{ task_list.contributors|map(contributor => contributor.email)|join(', ') }}
+            {% endif %}
+        </p>
+    </div>
+
+    {{ form_start(form) }}
+        {{ form_row(form.contributor, {label: 'Invite user'}) }}
+        <div class="btn-group">
+            <button class="btn btn-outline-primary" type="submit">Add</button>
+            <a href="{{ path('tasklist_show', {id: task_list.id}) }}" class="btn btn-outline-secondary">Go back</a>
+        </div>
+    {{ form_end(form) }}
+{% endblock %}

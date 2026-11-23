@@ -1,0 +1,11 @@
+{% extends 'layout.html.twig' %}
+
+{% block content %}
+    <h2>Register for a new account</h2>
+
+    {{ form(form) }}
+
+    <div class="mt-3">
+        <a href="{{ path('login') }}">Back to login</a>
+    </div>
+{% endblock %}

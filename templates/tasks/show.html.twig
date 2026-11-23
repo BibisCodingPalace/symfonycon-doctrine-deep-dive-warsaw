@@ -1,0 +1,45 @@
+{% extends 'layout.html.twig' %}
+
+{% block content %}
+    <div class="{{ task_list.archived ? 'bg-secondary-subtle' : 'bg-white' }} rounded shadow-sm p-3 mb-3">
+        <h2>{% if task_list.archived %}<span class="badge text-bg-secondary">archived</span>{% endif %} {{ task_list.title|title }}</h2>
+        <p>
+            created by <strong>{{ task_list.owner.email }}</strong>
+            {% if task_list.contributors is not empty %}
+                with contributions from: {{ task_list.contributors|map(contributor => contributor.email)|join(', ') }}
+            {% endif %}
+        </p>
+        <div class="d-flex justify-content-between align-items-baseline">
+            <form action="{{ path('tasklist_archive', {id: task_list.id}) }}" method="post">
+                <div class="btn-group btn-group-sm">
+                    <a href="{{ path('tasklist_recent', {id: task_list.id}) }}" class="btn btn-outline-primary">Today's tasks</a>
+                    {% if not task_list.archived %}
+                        <a href="{{ path('tasklist_contributors', {id: task_list.id}) }}" class="btn btn-outline-primary">Add contributor</a>
+                        <button type="submit" class="btn btn-outline-secondary">Archive list</button>
+                    {% endif %}
+                </div>
+            </form>
+            <small class="text-body-secondary">created on {{ task_list.createdOn|date('d.m.Y H:i') }}</small>
+        </div>
+    </div>
+
+    {% if not task_list.archived %}
+        <form action="{{ path('tasklist_add', {id: task_list.id}) }}" method="post" class="mb-4">
+            <div class="row g-2">
+                <div class="col-sm-9 col-lg-10">
+                    <label for="task_summary" class="visually-hidden">Task summary</label>
+                    <input id="task_summary" type="text" class="form-control form-control-lg" name="summary" placeholder="Enter your task summary" required>
+                </div>
+                <div class="col-sm-3 col-lg-2 d-grid">
+                    <button class="btn btn-outline-primary btn-lg" type="submit">Add task</button>
+                </div>
+            </div>
+        </form>
+    {% endif %}
+
+    <div class="list-group">
+        {% for task in task_list.items %}
+            {{ include('tasks/_task_list_item.html.twig') }}
+        {% endfor %}
+    </div>
+{% endblock %}
