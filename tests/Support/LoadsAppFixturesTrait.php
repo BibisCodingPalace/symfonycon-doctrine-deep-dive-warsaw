@@ -7,26 +7,26 @@ namespace App\Tests\Support;
 use App\DataFixtures\AppFixtures;
 use App\Entity\TaskList;
 use App\Entity\User;
-use Doctrine\Common\DataFixtures\Purger\ORMPurger;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Purges the test database and loads {@see AppFixtures}, so that every test starts from the same data.
+ * Loads {@see AppFixtures} for tests which need the complete demo data.
+ *
+ * There is no need to purge the database first: every test runs in a transaction which is rolled back
+ * by dama/doctrine-test-bundle, so every test starts with an empty database.
  *
  * Requires a booted kernel ({@see KernelTestCase::bootKernel()} or WebTestCase::createClient()).
  *
  * @mixin KernelTestCase
  */
-trait ReloadsAppFixturesTrait
+trait LoadsAppFixturesTrait
 {
-    protected static function reloadAppFixtures(): void
+    protected static function loadAppFixtures(): void
     {
         $container = static::getContainer();
         $entityManager = $container->get(EntityManagerInterface::class);
-
-        (new ORMPurger($entityManager))->purge();
 
         (new AppFixtures($container->get(UserPasswordHasherInterface::class)))->load($entityManager);
         $entityManager->clear();

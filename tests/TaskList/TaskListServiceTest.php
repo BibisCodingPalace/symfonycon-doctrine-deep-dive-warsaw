@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\TaskList;
 
-use App\DataFixtures\AppFixtures;
 use App\Entity\TaskList;
+use App\Factory\TaskFactory;
+use App\Factory\TaskListFactory;
+use App\Factory\UserFactory;
 use App\TaskList\TaskListService;
-use App\Tests\Support\ReloadsAppFixturesTrait;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\OptimisticLockException;
@@ -15,21 +16,16 @@ use PHPUnit\Framework\Attributes\Group;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
+/**
+ * Every test creates exactly the data it needs with Foundry factories.
+ */
 #[Group('integration')]
 #[Group('stateful')]
 final class TaskListServiceTest extends KernelTestCase
 {
-    use ReloadsAppFixturesTrait;
-
-    protected function setUp(): void
-    {
-        self::bootKernel();
-        static::reloadAppFixtures();
-    }
-
     public function testCreateTaskListPersistsListForOwner(): void
     {
-        $owner = self::fixtureUser(AppFixtures::USER3_EMAIL);
+        $owner = UserFactory::createOne();
 
         $taskList = $this->service()->createTaskList($owner, '  Groceries ');
 
@@ -44,14 +40,15 @@ final class TaskListServiceTest extends KernelTestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('List title cannot be empty.');
 
-        $this->service()->createTaskList(self::fixtureUser(AppFixtures::USER3_EMAIL), '   ');
+        $this->service()->createTaskList(UserFactory::createOne(), '   ');
     }
 
     public function testContributorsCanAddTasks(): void
     {
-        $taskList = self::fixtureList('Shared list of user 1');
+        $contributor = UserFactory::createOne();
+        $taskList = TaskListFactory::new()->sharedWith($contributor)->withTasks('Existing task')->create();
 
-        $task = $this->service()->addTask(self::fixtureUser(AppFixtures::USER2_EMAIL), $taskList, 'Added by user 2');
+        $task = $this->service()->addTask($contributor, $taskList, 'Added by the contributor');
 
         self::assertNotNull($task->getId(), 'The task is persisted by the cascade on TaskList::$items.');
         self::assertCount(2, $taskList->getItems());
@@ -62,29 +59,23 @@ final class TaskListServiceTest extends KernelTestCase
     {
         $this->expectException(AccessDeniedException::class);
 
-        $this->service()->addTask(
-            self::fixtureUser(AppFixtures::USER3_EMAIL),
-            self::fixtureList('Shared list of user 1'),
-            'Not allowed',
-        );
+        $this->service()->addTask(UserFactory::createOne(), TaskListFactory::createOne(), 'Not allowed');
     }
 
     public function testArchivedListsCannotBeModified(): void
     {
+        $taskList = TaskListFactory::new()->archived()->create();
+
         $this->expectException(AccessDeniedException::class);
         $this->expectExceptionMessage('Archived lists cannot be modified.');
 
-        $this->service()->addTask(
-            self::fixtureUser(AppFixtures::USER1_EMAIL),
-            self::fixtureList('Archived list of user 1'),
-            'Too late',
-        );
+        $this->service()->addTask($taskList->getOwner(), $taskList, 'Too late');
     }
 
     public function testToggleTaskClosesAndReopensTask(): void
     {
-        $owner = self::fixtureUser(AppFixtures::USER1_EMAIL);
-        $task = self::fixtureList('User 1 main list')->getItems()[0];
+        $task = TaskFactory::createOne();
+        $owner = $task->getList()->getOwner();
 
         $this->service()->toggleTask($owner, $task);
         self::assertTrue($task->isDone());
@@ -95,39 +86,38 @@ final class TaskListServiceTest extends KernelTestCase
 
     public function testOnlyTheOwnerCanAddContributors(): void
     {
+        $contributor = UserFactory::createOne();
+        $taskList = TaskListFactory::new()->sharedWith($contributor)->create();
+
         $this->expectException(AccessDeniedException::class);
         $this->expectExceptionMessage('Only the list owner can add contributors.');
 
-        $this->service()->addContributor(
-            self::fixtureUser(AppFixtures::USER2_EMAIL),
-            self::fixtureList('Shared list of user 1'),
-            self::fixtureUser(AppFixtures::USER3_EMAIL),
-        );
+        $this->service()->addContributor($contributor, $taskList, UserFactory::createOne());
     }
 
     public function testAddContributorStoresTheAssociation(): void
     {
         $entityManager = self::getContainer()->get(EntityManagerInterface::class);
-        $taskList = self::fixtureList('User 1 main list');
+        $taskList = TaskListFactory::createOne();
+        $contributor = UserFactory::createOne();
 
-        $this->service()->addContributor(
-            self::fixtureUser(AppFixtures::USER1_EMAIL),
-            $taskList,
-            self::fixtureUser(AppFixtures::USER3_EMAIL),
-        );
+        $this->service()->addContributor($taskList->getOwner(), $taskList, $contributor);
         $entityManager->clear();
 
-        $reloaded = self::fixtureList('User 1 main list');
-        self::assertNotSame($taskList, $reloaded);
-        self::assertTrue($reloaded->isAccessibleBy(self::fixtureUser(AppFixtures::USER3_EMAIL)));
+        $reloadedList = $entityManager->find(TaskList::class, $taskList->getId());
+        self::assertNotSame($taskList, $reloadedList);
+        self::assertSame(
+            [$contributor->getEmail()],
+            array_map(static fn ($user): string => $user->getEmail(), $reloadedList->getContributors()),
+        );
     }
 
     public function testArchiveMarksListAsArchivedAndIncrementsTheVersion(): void
     {
-        $taskList = self::fixtureList('User 1 main list');
+        $taskList = TaskListFactory::createOne();
         $version = $taskList->getVersion();
 
-        $this->service()->archive(self::fixtureUser(AppFixtures::USER1_EMAIL), $taskList, $version);
+        $this->service()->archive($taskList->getOwner(), $taskList, $version);
 
         self::assertTrue($taskList->isArchived());
         self::assertSame($version + 1, $taskList->getVersion());
@@ -135,14 +125,14 @@ final class TaskListServiceTest extends KernelTestCase
 
     public function testArchiveFailsIfTheUserHasSeenAnOlderVersion(): void
     {
-        $taskList = self::fixtureList('User 1 main list');
+        $taskList = TaskListFactory::createOne();
         $seenVersion = $taskList->getVersion();
 
         $this->changeListInAnotherRequest($taskList);
         self::getContainer()->get(EntityManagerInterface::class)->refresh($taskList);
 
         try {
-            $this->service()->archive(self::fixtureUser(AppFixtures::USER1_EMAIL), $taskList, $seenVersion);
+            $this->service()->archive($taskList->getOwner(), $taskList, $seenVersion);
             self::fail('Expected an OptimisticLockException.');
         } catch (OptimisticLockException) {
             self::assertFalse($taskList->isArchived(), 'The version is checked before the list is changed.');
@@ -151,14 +141,16 @@ final class TaskListServiceTest extends KernelTestCase
 
     public function testArchiveFailsIfTheListIsChangedWhileTheRequestIsRunning(): void
     {
-        $taskList = self::fixtureList('User 1 main list');
+        $taskList = TaskListFactory::createOne();
+        $owner = $taskList->getOwner();
+        $version = $taskList->getVersion();
 
         // The entity in memory still has the old version, only the versioned UPDATE detects the conflict.
         $this->changeListInAnotherRequest($taskList);
 
         $this->expectException(OptimisticLockException::class);
 
-        $this->service()->archive(self::fixtureUser(AppFixtures::USER1_EMAIL), $taskList, $taskList->getVersion());
+        $this->service()->archive($owner, $taskList, $version);
     }
 
     /**

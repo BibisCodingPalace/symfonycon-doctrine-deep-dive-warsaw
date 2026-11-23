@@ -40,6 +40,12 @@
     </source>
 
     <extensions>
+        <!-- Creates and migrates the test database before the first test, for all tests which boot the kernel -->
+        <bootstrap class="Zenstruck\Foundry\PHPUnit\FoundryExtension">
+            <parameter name="enabled-auto-reset" value="true" />
+        </bootstrap>
+        <!-- Wraps every test in a transaction which is rolled back afterwards -->
+        <bootstrap class="DAMA\DoctrineTestBundle\PHPUnit\PHPUnitExtension" />
         <bootstrap class="Symfony\Bridge\PhpUnit\SymfonyExtension">
             <parameter name="clock-mock-namespaces" value="App" />
             <parameter name="dns-mock-namespaces" value="App" />

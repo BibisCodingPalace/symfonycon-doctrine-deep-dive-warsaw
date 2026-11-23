@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Repository;
 
-use App\Tests\Support\ReloadsAppFixturesTrait;
+use App\Tests\Support\LoadsAppFixturesTrait;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
@@ -12,11 +12,11 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
  */
 abstract class AbstractRepositoryKernelTestCase extends KernelTestCase
 {
-    use ReloadsAppFixturesTrait;
+    use LoadsAppFixturesTrait;
 
     protected function setUp(): void
     {
         self::bootKernel();
-        static::reloadAppFixtures();
+        static::loadAppFixtures();
     }
 }

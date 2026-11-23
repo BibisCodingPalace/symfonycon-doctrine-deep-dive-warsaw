@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\DataFixtures\AppFixtures;
-use App\Tests\Support\ReloadsAppFixturesTrait;
+use App\Tests\Support\LoadsAppFixturesTrait;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\TestWith;
@@ -16,14 +16,14 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 #[Group('stateful')]
 final class TaskListControllerTest extends WebTestCase
 {
-    use ReloadsAppFixturesTrait;
+    use LoadsAppFixturesTrait;
 
     private KernelBrowser $client;
 
     protected function setUp(): void
     {
         $this->client = static::createClient();
-        static::reloadAppFixtures();
+        static::loadAppFixtures();
     }
 
     public function testGuestsAreRedirectedToLogin(): void
