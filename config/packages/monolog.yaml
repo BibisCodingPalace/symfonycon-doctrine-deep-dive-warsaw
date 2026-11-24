@@ -28,6 +28,9 @@ when@test:
                 type: stream
                 path: "%kernel.logs_dir%/%kernel.environment%.log"
                 level: debug
+            # Keeps all log records in memory, so that tests can make assertions on them
+            test:
+                type: test
 
 when@prod:
     monolog:
