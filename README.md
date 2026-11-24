@@ -101,7 +101,11 @@ The overview runs the same queries on every request. Configure a result cache
 pool and cache the overview queries for an hour. Give every cached query its own
 result cache id and check the effect in the Doctrine panel of the profiler.
 
-You can empty the result cache at any time:
+A cached result does not notice changes: create a list and it is missing in the
+overview. Delete the cached results whenever a list is changed, that is what the
+result cache ids are for.
+
+You can also empty the result cache by hand at any time:
 
 ```bash
 docker compose exec app bin/console cache:pool:clear doctrine.result_cache_pool
@@ -111,14 +115,18 @@ Solution: `tasks/task-2`
 
 ### Task 3 – Event listener
 
-Since task 2 the overview is stale: create a list, add a task or add a
-contributor, and the change does not show up until the cache expires.
-Write a Doctrine event listener which invalidates the result cache whenever a
-task list, one of its tasks or its contributors change.
+Keep a simple change log: write a log entry whenever a task is changed, i.e.
+closed or reopened.
 
-- Which events do you need? Start with the lifecycle events (`postPersist`, `postUpdate`) and see which changes they miss.
-- `onFlush` gives you access to everything the `UnitOfWork` is about to write, including collection changes.
-- When is the right moment to delete the cache entries?
+- Write a Doctrine entity listener for `Task` which listens to the `postUpdate` event.
+- Log with the Monolog logger, just inject `Psr\Log\LoggerInterface`. No extra table or file is needed.
+- Bonus: log what has changed. The `UnitOfWork` knows the change set of the task.
+
+You find the log entries in the "Logs" panel of the profiler and in the log file:
+
+```bash
+docker compose exec app tail -f var/log/dev.log | grep app.INFO
+```
 
 Solution: `tasks/task-3`
 
